@@ -58,16 +58,6 @@ app.use('/api/reports', require('./routes/reports'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/logs', require('./routes/logs'));
 
-// Serve static files from React app in production
-if (process.env.NODE_ENV === 'production') {
-  const buildPath = path.join(__dirname, '../frontend/client/build');
-  app.use(express.static(buildPath));
-
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(buildPath, 'index.html'));
-  });
-}
-
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -78,13 +68,24 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ 
-    success: false, 
-    message: 'Route not found' 
+// Serve static files from React app in production
+if (process.env.NODE_ENV === 'production') {
+  const buildPath = path.join(__dirname, '../frontend/client/build');
+  app.use(express.static(buildPath));
+
+  // Catch-all handler to serve React app for any route not handled by API
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(buildPath, 'index.html'));
   });
-});
+} else {
+  // 404 handler for development
+  app.use('*', (req, res) => {
+    res.status(404).json({ 
+      success: false, 
+      message: 'Route not found' 
+    });
+  });
+}
 
 const PORT = process.env.PORT || 5000;
 

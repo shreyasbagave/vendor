@@ -8,8 +8,9 @@
     "dev": "nodemon server.js",
     "client": "cd ../frontend/client && npm start",
     "server": "nodemon server.js",
-    "build": "cd ../frontend/client && npm run build",
-    "heroku-postbuild": "npm install && cd ../frontend/client && npm install && npm run build"
+    "build": "npm install --prefix ../frontend/client && npm run build --prefix ../frontend/client",
+    "heroku-postbuild": "npm install && npm install --prefix ../frontend/client && npm run build --prefix ../frontend/client",
+    "render-build": "npm install && npm install --prefix ../frontend/client && npm run build --prefix ../frontend/client"
   },
   "keywords": [
     "stock",
