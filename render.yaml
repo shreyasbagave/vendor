@@ -1,0 +1,20 @@
+services:
+  # Backend API Service
+  - type: web
+    name: stock-management-api
+    env: node
+    region: oregon
+    buildCommand: cd backend && npm install && npm run render-build
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: PORT
+        value: 5000
+    healthCheckPath: /
+    autoDeploy: true
+
