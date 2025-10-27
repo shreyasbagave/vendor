@@ -43,13 +43,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [user]);
 
     const login = useCallback(async (username: string, password: string) => {
-        const res = await api.post<LoginResponse>('/auth/login', { username, password });
-        if (res.data?.success && res.data.data?.token && res.data.data.user) {
-            setToken(res.data.data.token);
-            setUser(res.data.data.user);
-            return;
+        try {
+            console.log('🔐 Attempting login to:', api['axiosInstance'].defaults.baseURL);
+            const res = await api.post<LoginResponse>('/auth/login', { username, password });
+            console.log('✅ Login response:', res.status, res.data);
+            if (res.data?.success && res.data.data?.token && res.data.data.user) {
+                setToken(res.data.data.token);
+                setUser(res.data.data.user);
+                return;
+            }
+            throw new Error(res.data?.message || 'Login failed');
+        } catch (error: any) {
+            console.error('❌ Login error:', error.message, error.response?.status, error.response?.data);
+            throw error;
         }
-        throw new Error(res.data?.message || 'Login failed');
     }, [api]);
 
     const register = useCallback(async (username: string, email: string, password: string) => {
