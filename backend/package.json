@@ -10,7 +10,7 @@
     "server": "nodemon server.js",
     "build": "npm install --prefix ../frontend/client && npm run build --prefix ../frontend/client",
     "heroku-postbuild": "npm install && npm install --prefix ../frontend/client && npm run build --prefix ../frontend/client",
-    "render-build": "npm install && npm install --prefix ../frontend/client && npm run build --prefix ../frontend/client"
+    "render-build": "npm install && npm install --legacy-peer-deps --prefix ../frontend/client && npm run build --prefix ../frontend/client"
   },
   "keywords": [
     "stock",
