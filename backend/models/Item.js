@@ -52,9 +52,9 @@ itemSchema.index({ name: 1 });
 itemSchema.index({ category: 1 });
 itemSchema.index({ isActive: 1 });
 
-// Virtual for low stock status
+// Virtual for low stock status (only if minimumStock is set)
 itemSchema.virtual('isLowStock').get(function() {
-  return this.currentStock <= this.minimumStock;
+  return this.minimumStock > 0 && this.currentStock <= this.minimumStock;
 });
 
 // Ensure virtual fields are serialized

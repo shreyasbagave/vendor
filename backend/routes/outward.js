@@ -4,15 +4,15 @@ const OutwardStock = require('../models/OutwardStock');
 const Item = require('../models/Item');
 const Customer = require('../models/Customer');
 const { protect, authorize, logActivity } = require('../middleware/auth');
+const { validateObjectId, validateBodyObjectIds } = require('../middleware/validateObjectId');
 
 const router = express.Router();
 
-// @desc    Get all outward stock entries
+// @desc    Get all outward stock entries (only for logged-in user)
 // @route   GET /api/outward
-// @access  Private
+// @access  Private (Any authenticated user)
 router.get('/', [
   protect,
-  authorize('admin'),
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('startDate').optional().isISO8601().withMessage('Start date must be a valid date'),
@@ -88,10 +88,10 @@ router.get('/', [
   }
 });
 
-// @desc    Get single outward stock entry
+// @desc    Get single outward stock entry (only user's own)
 // @route   GET /api/outward/:id
-// @access  Private
-router.get('/:id', [protect, authorize('admin')], async (req, res) => {
+// @access  Private (Any authenticated user)
+router.get('/:id', [protect], async (req, res) => {
   try {
     const outwardEntry = await OutwardStock.findOne({
       _id: req.params.id,
@@ -121,30 +121,32 @@ router.get('/:id', [protect, authorize('admin')], async (req, res) => {
   }
 });
 
-// @desc    Create new outward stock entry
+// @desc    Create new outward stock entry (for logged-in user)
 // @route   POST /api/outward
-// @access  Private
+// @access  Private (Any authenticated user)
 router.post('/', [
   protect,
-  authorize('admin'),
   body('challanNo').notEmpty().trim().withMessage('Challan number is required'),
-  body('customer').isMongoId().withMessage('Valid customer is required'),
-  body('item').isMongoId().withMessage('Valid item is required'),
-  body('okQty').isFloat({ min: 0 }).withMessage('OK quantity must be non-negative'),
+  body('vehicleNumber').optional().trim().isLength({ max: 20 }).withMessage('Vehicle number cannot exceed 20 characters'),
+  body('customer').notEmpty().withMessage('Customer is required').isMongoId().withMessage('Invalid customer ID format'),
+  body('item').notEmpty().withMessage('Item is required').isMongoId().withMessage('Invalid item ID format'),
+  body('okQty').optional().isFloat({ min: 0 }).withMessage('OK quantity must be non-negative'),
   body('crQty').optional().isFloat({ min: 0 }).withMessage('CR quantity must be non-negative'),
   body('mrQty').optional().isFloat({ min: 0 }).withMessage('MR quantity must be non-negative'),
   body('asCastQty').optional().isFloat({ min: 0 }).withMessage('As Cast quantity must be non-negative'),
-  // unit removed
-  // rate removed
   body('date').optional().isISO8601().withMessage('Date must be valid')
 ], logActivity('OUTWARD_CREATE', 'OutwardStock', (req, data) => data.data._id), async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({
         success: false,
-        message: 'Validation errors',
-        errors: errors.array()
+        message: 'Please check all required fields',
+        errors: errors.array().map(err => ({
+          field: err.path || err.param,
+          message: err.msg
+        }))
       });
     }
 
@@ -166,23 +168,27 @@ router.post('/', [
       });
     }
 
-    // Calculate total quantity
-    const totalQty = (req.body.okQty || 0) + (req.body.crQty || 0) + (req.body.mrQty || 0) + (req.body.asCastQty || 0);
-
-    if (totalQty <= 0) {
+    // Validate OK quantity
+    const okQty = req.body.okQty || 0;
+    
+    if (okQty <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'Total quantity must be greater than 0'
+        message: 'OK quantity must be greater than 0'
       });
     }
 
-    // Check stock availability
-    if (item.currentStock < totalQty) {
+    // Check stock availability - only OK quantity leaves warehouse
+    if (item.currentStock < okQty) {
       return res.status(400).json({
         success: false,
-        message: `Insufficient stock. Available: ${item.currentStock}, Required: ${totalQty}`
+        message: `Insufficient stock. Available: ${item.currentStock}, Required: ${okQty}`
       });
     }
+    
+    // As Cast will be auto-calculated in model as remaining stock
+    const asCastQty = item.currentStock - okQty;
+    const totalQty = okQty + asCastQty;
 
     // Check for duplicate challan number for the same customer
     const existingEntry = await OutwardStock.findOne({
@@ -233,13 +239,13 @@ router.post('/', [
   }
 });
 
-// @desc    Update outward stock entry
+// @desc    Update outward stock entry (only user's own)
 // @route   PUT /api/outward/:id
-// @access  Private
+// @access  Private (Any authenticated user)
 router.put('/:id', [
   protect,
-  authorize('admin'),
   body('challanNo').optional().notEmpty().trim().withMessage('Challan number cannot be empty'),
+  body('vehicleNumber').optional().trim().isLength({ max: 20 }).withMessage('Vehicle number cannot exceed 20 characters'),
   body('customer').optional().isMongoId().withMessage('Valid customer is required'),
   body('item').optional().isMongoId().withMessage('Valid item is required'),
   body('okQty').optional().isFloat({ min: 0 }).withMessage('OK quantity must be non-negative'),
@@ -293,19 +299,16 @@ router.put('/:id', [
 
     // If updating quantities, validate stock availability
     if (req.body.okQty !== undefined || req.body.crQty !== undefined || 
-        req.body.mrQty !== undefined || req.body.asCastQty !== undefined) {
+        req.body.mrQty !== undefined) {
       
       const okQty = req.body.okQty !== undefined ? req.body.okQty : outwardEntry.okQty;
       const crQty = req.body.crQty !== undefined ? req.body.crQty : outwardEntry.crQty;
       const mrQty = req.body.mrQty !== undefined ? req.body.mrQty : outwardEntry.mrQty;
-      const asCastQty = req.body.asCastQty !== undefined ? req.body.asCastQty : outwardEntry.asCastQty;
       
-      const newTotalQty = okQty + crQty + mrQty + asCastQty;
-      
-      if (newTotalQty <= 0) {
+      if (okQty <= 0) {
         return res.status(400).json({
           success: false,
-          message: 'Total quantity must be greater than 0'
+          message: 'OK quantity must be greater than 0'
         });
       }
 
@@ -320,8 +323,9 @@ router.put('/:id', [
         });
       }
 
-      // Calculate available stock (current stock + old quantity - new quantity)
-      const availableStock = item.currentStock + outwardEntry.totalQty - newTotalQty;
+      // Calculate available stock: current stock + old OK qty (being returned) - new OK qty (being dispatched)
+      // Only OK quantity affects stock, As Cast is just a record of what remains
+      const availableStock = item.currentStock + outwardEntry.okQty - okQty;
       
       if (availableStock < 0) {
         return res.status(400).json({
@@ -331,15 +335,38 @@ router.put('/:id', [
       }
     }
 
+    // For updates, we need to manually recalculate As Cast
+    // First, restore the old OK qty to stock, then apply the new one
+    const itemId = req.body.item || outwardEntry.item;
+    const item = await Item.findById(itemId);
+    
+    // Calculate new As Cast based on current stock (after restoring old qty)
+    const restoredStock = item.currentStock + outwardEntry.okQty;
+    const newOkQty = req.body.okQty !== undefined ? req.body.okQty : outwardEntry.okQty;
+    const newAsCastQty = restoredStock - newOkQty;
+    
+    // Update the entry with recalculated values
+    const updateData = {
+      ...req.body,
+      asCastQty: newAsCastQty,
+      totalQty: newOkQty + newAsCastQty
+    };
+    
     const updatedEntry = await OutwardStock.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     ).populate([
       { path: 'customer', select: 'name contactPerson email phone' },
       { path: 'item', select: 'name category unit currentStock' },
       { path: 'createdBy', select: 'name email' }
     ]);
+    
+    // Manually update stock: restore old OK, deduct new OK
+    await Item.findByIdAndUpdate(
+      itemId,
+      { $inc: { currentStock: outwardEntry.okQty - newOkQty } }
+    );
 
     res.status(200).json({
       success: true,
@@ -363,12 +390,11 @@ router.put('/:id', [
   }
 });
 
-// @desc    Delete outward stock entry
+// @desc    Delete outward stock entry (only user's own)
 // @route   DELETE /api/outward/:id
-// @access  Private
+// @access  Private (Any authenticated user)
 router.delete('/:id', [
-  protect,
-  authorize('admin')
+  protect
 ], logActivity('OUTWARD_DELETE', 'OutwardStock'), async (req, res) => {
   try {
     const outwardEntry = await OutwardStock.findOne({
@@ -398,12 +424,11 @@ router.delete('/:id', [
   }
 });
 
-// @desc    Get outward stock summary
+// @desc    Get outward stock summary (only user's own)
 // @route   GET /api/outward/summary
-// @access  Private
+// @access  Private (Any authenticated user)
 router.get('/summary', [
   protect,
-  authorize('admin'),
   query('startDate').optional().isISO8601().withMessage('Start date must be a valid date'),
   query('endDate').optional().isISO8601().withMessage('End date must be a valid date')
 ], async (req, res) => {
@@ -555,8 +580,8 @@ router.get('/summary', [
 
 // @desc    Get CR/MR alerts (items with high rejection rates)
 // @route   GET /api/outward/alerts/rejects
-// @access  Private
-router.get('/alerts/rejects', [protect, authorize('admin')], async (req, res) => {
+// @access  Private (Any authenticated user)
+router.get('/alerts/rejects', [protect], async (req, res) => {
   try {
     const rejectAlerts = await OutwardStock.aggregate([
       {

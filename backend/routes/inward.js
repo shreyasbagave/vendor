@@ -4,15 +4,15 @@ const InwardStock = require('../models/InwardStock');
 const Item = require('../models/Item');
 const Supplier = require('../models/Supplier');
 const { protect, authorize, logActivity } = require('../middleware/auth');
+const { validateObjectId, validateBodyObjectIds } = require('../middleware/validateObjectId');
 
 const router = express.Router();
 
-// @desc    Get all inward stock entries
+// @desc    Get all inward stock entries (only for logged-in user)
 // @route   GET /api/inward
-// @access  Private
+// @access  Private (Any authenticated user)
 router.get('/', [
   protect,
-  authorize('admin'),
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('startDate').optional().isISO8601().withMessage('Start date must be a valid date'),
@@ -88,10 +88,10 @@ router.get('/', [
   }
 });
 
-// @desc    Get single inward stock entry
+// @desc    Get single inward stock entry (only user's own)
 // @route   GET /api/inward/:id
-// @access  Private
-router.get('/:id', [protect, authorize('admin')], async (req, res) => {
+// @access  Private (Any authenticated user)
+router.get('/:id', [protect], async (req, res) => {
   try {
     const inwardEntry = await InwardStock.findOne({
       _id: req.params.id,
@@ -121,27 +121,29 @@ router.get('/:id', [protect, authorize('admin')], async (req, res) => {
   }
 });
 
-// @desc    Create new inward stock entry
+// @desc    Create new inward stock entry (for logged-in user)
 // @route   POST /api/inward
-// @access  Private
+// @access  Private (Any authenticated user)
 router.post('/', [
   protect,
-  authorize('admin'),
   body('challanNo').notEmpty().trim().withMessage('Challan number is required'),
-  body('supplier').isMongoId().withMessage('Valid supplier is required'),
-  body('item').isMongoId().withMessage('Valid item is required'),
-  body('quantityReceived').isFloat({ min: 0.01 }).withMessage('Quantity must be greater than 0'),
-  // unit removed
-  // rate removed
+  body('vehicleNumber').optional().trim().isLength({ max: 20 }).withMessage('Vehicle number cannot exceed 20 characters'),
+  body('supplier').notEmpty().withMessage('Supplier is required').isMongoId().withMessage('Invalid supplier ID format'),
+  body('item').notEmpty().withMessage('Item is required').isMongoId().withMessage('Invalid item ID format'),
+  body('quantityReceived').notEmpty().withMessage('Quantity is required').isFloat({ min: 0.01 }).withMessage('Quantity must be greater than 0'),
   body('date').optional().isISO8601().withMessage('Date must be valid')
 ], logActivity('INWARD_CREATE', 'InwardStock', (req, data) => data.data._id), async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({
         success: false,
-        message: 'Validation errors',
-        errors: errors.array()
+        message: 'Please check all required fields',
+        errors: errors.array().map(err => ({
+          field: err.path || err.param,
+          message: err.msg
+        }))
       });
     }
 
@@ -211,13 +213,13 @@ router.post('/', [
   }
 });
 
-// @desc    Update inward stock entry
+// @desc    Update inward stock entry (only user's own)
 // @route   PUT /api/inward/:id
-// @access  Private
+// @access  Private (Any authenticated user)
 router.put('/:id', [
   protect,
-  authorize('admin'),
   body('challanNo').optional().notEmpty().trim().withMessage('Challan number cannot be empty'),
+  body('vehicleNumber').optional().trim().isLength({ max: 20 }).withMessage('Vehicle number cannot exceed 20 characters'),
   body('supplier').optional().isMongoId().withMessage('Valid supplier is required'),
   body('item').optional().isMongoId().withMessage('Valid item is required'),
   body('quantityReceived').optional().isFloat({ min: 0.01 }).withMessage('Quantity must be greater than 0'),
@@ -313,12 +315,11 @@ router.put('/:id', [
   }
 });
 
-// @desc    Delete inward stock entry
+// @desc    Delete inward stock entry (only user's own)
 // @route   DELETE /api/inward/:id
-// @access  Private
+// @access  Private (Any authenticated user)
 router.delete('/:id', [
-  protect,
-  authorize('admin')
+  protect
 ], logActivity('INWARD_DELETE', 'InwardStock'), async (req, res) => {
   try {
     const inwardEntry = await InwardStock.findOne({
@@ -348,12 +349,11 @@ router.delete('/:id', [
   }
 });
 
-// @desc    Get inward stock summary
+// @desc    Get inward stock summary (only user's own)
 // @route   GET /api/inward/summary
-// @access  Private
+// @access  Private (Any authenticated user)
 router.get('/summary', [
   protect,
-  authorize('admin'),
   query('startDate').optional().isISO8601().withMessage('Start date must be a valid date'),
   query('endDate').optional().isISO8601().withMessage('End date must be a valid date')
 ], async (req, res) => {

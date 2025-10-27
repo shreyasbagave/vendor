@@ -5,12 +5,11 @@ const { protect, authorize, logActivity } = require('../middleware/auth');
 
 const router = express.Router();
 
-// @desc    Get all customers
+// @desc    Get all customers (only for logged-in user)
 // @route   GET /api/customers
-// @access  Private
+// @access  Private (Any authenticated user)
 router.get('/', [
   protect,
-  authorize('admin'),
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('search').optional().isString().withMessage('Search must be a string'),
@@ -78,10 +77,10 @@ router.get('/', [
   }
 });
 
-// @desc    Get single customer
+// @desc    Get single customer (only user's own)
 // @route   GET /api/customers/:id
-// @access  Private
-router.get('/:id', [protect, authorize('admin')], async (req, res) => {
+// @access  Private (Any authenticated user)
+router.get('/:id', [protect], async (req, res) => {
   try {
     const customer = await Customer.findOne({
       _id: req.params.id,
@@ -109,12 +108,11 @@ router.get('/:id', [protect, authorize('admin')], async (req, res) => {
   }
 });
 
-// @desc    Create new customer
+// @desc    Create new customer (for logged-in user)
 // @route   POST /api/customers
-// @access  Private
+// @access  Private (Any authenticated user)
 router.post('/', [
   protect,
-  authorize('admin'),
   body('name').notEmpty().trim().withMessage('Customer name is required'),
   body('email').optional().isEmail().normalizeEmail().withMessage('Please provide a valid email'),
   body('phone').optional().isMobilePhone().withMessage('Please provide a valid phone number'),
@@ -162,12 +160,11 @@ router.post('/', [
   }
 });
 
-// @desc    Update customer
+// @desc    Update customer (only user's own)
 // @route   PUT /api/customers/:id
-// @access  Private
+// @access  Private (Any authenticated user)
 router.put('/:id', [
   protect,
-  authorize('admin'),
   body('name').optional().notEmpty().trim().withMessage('Customer name cannot be empty'),
   body('email').optional().isEmail().normalizeEmail().withMessage('Please provide a valid email'),
   body('phone').optional().isMobilePhone().withMessage('Please provide a valid phone number'),
@@ -224,12 +221,11 @@ router.put('/:id', [
   }
 });
 
-// @desc    Delete customer
+// @desc    Delete customer (only user's own)
 // @route   DELETE /api/customers/:id
-// @access  Private
+// @access  Private (Any authenticated user)
 router.delete('/:id', [
-  protect,
-  authorize('admin')
+  protect
 ], logActivity('CUSTOMER_DELETE', 'Customer'), async (req, res) => {
   try {
     const customer = await Customer.findOne({

@@ -12,6 +12,11 @@ const inwardStockSchema = new mongoose.Schema({
     trim: true,
     maxlength: [50, 'Challan number cannot exceed 50 characters']
   },
+  vehicleNumber: {
+    type: String,
+    trim: true,
+    maxlength: [20, 'Vehicle number cannot exceed 20 characters']
+  },
   supplier: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Supplier',

@@ -159,33 +159,96 @@ class ExcelExporter {
     worksheet.getCell('A2').font = { bold: true, size: 16 };
     worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
-    // Add summary section
-    worksheet.mergeCells('A4:H4');
+    // Add summary section header
+    worksheet.mergeCells('A4:F4');
     worksheet.getCell('A4').value = 'SUMMARY';
-    worksheet.getCell('A4').font = { bold: true, size: 14 };
+    worksheet.getCell('A4').font = { bold: true, size: 12 };
     worksheet.getCell('A4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'E6E6FA' } };
+    worksheet.getCell('A4').alignment = { horizontal: 'center' };
 
-    // Inward summary
-    worksheet.addRow(['INWARD SUMMARY']);
-    worksheet.addRow(['Total Entries', inward.totalEntries]);
-    worksheet.addRow(['Total Quantity', inward.totalQuantity]);
-    worksheet.addRow(['Total Amount', inward.totalAmount]);
-    worksheet.addRow(['Unique Suppliers', inward.supplierCount]);
-    worksheet.addRow(['Unique Items', inward.itemCount]);
+    // Store starting row for side-by-side tables
+    let summaryStartRow = worksheet.lastRow.number + 2;
 
-    // Outward summary
-    worksheet.addRow(['OUTWARD SUMMARY']);
-    worksheet.addRow(['Total Entries', outward.totalEntries]);
-    worksheet.addRow(['Total Quantity', outward.totalQuantity]);
-    worksheet.addRow(['OK Quantity', outward.totalOkQty]);
-    worksheet.addRow(['CR Quantity', outward.totalCrQty]);
-    worksheet.addRow(['MR Quantity', outward.totalMrQty]);
-    worksheet.addRow(['As Cast Quantity', outward.totalAsCastQty]);
-    worksheet.addRow(['Total Amount', outward.totalAmount]);
-    worksheet.addRow(['Unique Customers', outward.customerCount]);
+    // Inward Summary Table (Left side - columns A-B)
+    worksheet.mergeCells(`A${summaryStartRow}:B${summaryStartRow}`);
+    worksheet.getCell(`A${summaryStartRow}`).value = 'INWARD SUMMARY';
+    worksheet.getCell(`A${summaryStartRow}`).font = { bold: true, size: 10 };
+    worksheet.getCell(`A${summaryStartRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'D4EDDA' } };
+    worksheet.getCell(`A${summaryStartRow}`).alignment = { horizontal: 'center' };
+    
+    summaryStartRow++;
+    worksheet.getCell(`A${summaryStartRow}`).value = 'Metric';
+    worksheet.getCell(`B${summaryStartRow}`).value = 'Value';
+    worksheet.getCell(`A${summaryStartRow}`).style = { ...this.headerStyle, font: { bold: true, color: { argb: 'FFFFFF' }, size: 10 } };
+    worksheet.getCell(`B${summaryStartRow}`).style = { ...this.headerStyle, font: { bold: true, color: { argb: 'FFFFFF' }, size: 10 } };
+    
+    const inwardData = [
+      ['Total Entries', inward.totalEntries],
+      ['Total Quantity', inward.totalQuantity],
+      ['Unique Suppliers', inward.supplierCount],
+      ['Unique Items', inward.itemCount]
+    ];
+    
+    summaryStartRow++;
+    inwardData.forEach(([metric, value]) => {
+      worksheet.getCell(`A${summaryStartRow}`).value = metric;
+      worksheet.getCell(`B${summaryStartRow}`).value = value;
+      worksheet.getCell(`A${summaryStartRow}`).style = { ...this.dataStyle, font: { size: 10 } };
+      worksheet.getCell(`B${summaryStartRow}`).style = { ...this.numberStyle, font: { size: 10 } };
+      summaryStartRow++;
+    });
+
+    // Outward Summary Table (Right side - columns D-E)
+    summaryStartRow = worksheet.lastRow.number - inwardData.length - 1;
+    worksheet.mergeCells(`D${summaryStartRow}:E${summaryStartRow}`);
+    worksheet.getCell(`D${summaryStartRow}`).value = 'OUTWARD SUMMARY';
+    worksheet.getCell(`D${summaryStartRow}`).font = { bold: true, size: 10 };
+    worksheet.getCell(`D${summaryStartRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3CD' } };
+    worksheet.getCell(`D${summaryStartRow}`).alignment = { horizontal: 'center' };
+    
+    summaryStartRow++;
+    worksheet.getCell(`D${summaryStartRow}`).value = 'Metric';
+    worksheet.getCell(`E${summaryStartRow}`).value = 'Value';
+    worksheet.getCell(`D${summaryStartRow}`).style = { ...this.headerStyle, font: { bold: true, color: { argb: 'FFFFFF' }, size: 10 } };
+    worksheet.getCell(`E${summaryStartRow}`).style = { ...this.headerStyle, font: { bold: true, color: { argb: 'FFFFFF' }, size: 10 } };
+    
+    const outwardData = [
+      ['Total Entries', outward.totalEntries],
+      ['Total Quantity', outward.totalQuantity],
+      ['OK Quantity', outward.totalOkQty],
+      ['CR Quantity', outward.totalCrQty],
+      ['MR Quantity', outward.totalMrQty],
+      ['Unique Customers', outward.customerCount]
+    ];
+    
+    summaryStartRow++;
+    outwardData.forEach(([metric, value]) => {
+      worksheet.getCell(`D${summaryStartRow}`).value = metric;
+      worksheet.getCell(`E${summaryStartRow}`).value = value;
+      worksheet.getCell(`D${summaryStartRow}`).style = { ...this.dataStyle, font: { size: 10 } };
+      worksheet.getCell(`E${summaryStartRow}`).style = { ...this.numberStyle, font: { size: 10 } };
+      summaryStartRow++;
+    });
+
+    // Set compact column widths for side-by-side summary
+    worksheet.getColumn('A').width = 16;
+    worksheet.getColumn('B').width = 10;
+    worksheet.getColumn('C').width = 2; // Small gap
+    worksheet.getColumn('D').width = 16;
+    worksheet.getColumn('E').width = 10;
+
+    // Move to next section after the longer table
+    const maxRows = Math.max(inwardData.length, outwardData.length);
+    worksheet.addRow([]);
 
     // Item breakdown
-    worksheet.addRow(['ITEM-WISE BREAKDOWN']);
+    worksheet.addRow([]);
+    worksheet.mergeCells(`A${worksheet.lastRow.number}:I${worksheet.lastRow.number}`);
+    worksheet.getCell(`A${worksheet.lastRow.number}`).value = 'ITEM-WISE BREAKDOWN';
+    worksheet.getCell(`A${worksheet.lastRow.number}`).font = { bold: true, size: 10 };
+    worksheet.getCell(`A${worksheet.lastRow.number}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'E6E6FA' } };
+    worksheet.getCell(`A${worksheet.lastRow.number}`).alignment = { horizontal: 'center' };
+    
     const itemHeaders = [
       'Item Name', 'Category', 'Unit', 'Total Qty', 'OK Qty', 'CR Qty', 'MR Qty', 'As Cast Qty', 'Rejection Rate %'
     ];
@@ -193,7 +256,7 @@ class ExcelExporter {
 
     const itemHeaderRow = worksheet.lastRow;
     itemHeaderRow.eachCell((cell) => {
-      cell.style = this.headerStyle;
+      cell.style = { ...this.headerStyle, font: { bold: true, color: { argb: 'FFFFFF' }, size: 10 } };
     });
 
     itemBreakdown.forEach((item) => {
@@ -211,17 +274,23 @@ class ExcelExporter {
 
       row.eachCell((cell, colNumber) => {
         if (colNumber >= 4) { // Number columns
-          cell.style = this.numberStyle;
+          cell.style = { ...this.numberStyle, font: { size: 10 } };
         } else {
-          cell.style = this.dataStyle;
+          cell.style = { ...this.dataStyle, font: { size: 10 } };
         }
       });
     });
 
-    // Auto-fit columns
-    worksheet.columns.forEach((column) => {
-      column.width = Math.max(column.width || 10, 15);
-    });
+    // Set compact column widths
+    worksheet.getColumn('A').width = 18; // Item Name
+    worksheet.getColumn('B').width = 12; // Category
+    worksheet.getColumn('C').width = 8;  // Unit
+    worksheet.getColumn('D').width = 10; // Total Qty
+    worksheet.getColumn('E').width = 10; // OK Qty
+    worksheet.getColumn('F').width = 8;  // CR Qty
+    worksheet.getColumn('G').width = 8;  // MR Qty
+    worksheet.getColumn('H').width = 10; // As Cast Qty
+    worksheet.getColumn('I').width = 12; // Rejection Rate
 
     return this.workbook;
   }
@@ -234,7 +303,7 @@ class ExcelExporter {
 
     // Second sheet: Inward Logs
     const inwardSheet = this.workbook.addWorksheet('Inward Logs');
-    inwardSheet.addRow(['DATE', 'CH.NO', 'SUPPLIER', 'ITEM', 'QTY', 'UNIT', 'RATE', 'AMOUNT', 'REMARKS']);
+    inwardSheet.addRow(['DATE', 'CH.NO', 'SUPPLIER', 'ITEM', 'QTY', 'UNIT', 'VEHICLE NO', 'REMARKS']);
     const inwardHeader = inwardSheet.lastRow; inwardHeader.eachCell((c) => { c.style = this.headerStyle; });
     detailedInward.forEach((t) => {
       const row = inwardSheet.addRow([
@@ -244,19 +313,18 @@ class ExcelExporter {
         t.item?.name,
         t.quantityReceived,
         t.unit,
-        t.rate,
-        t.totalAmount,
+        t.vehicleNumber || '-',
         t.remarks
       ]);
       row.eachCell((cell, col) => {
-        if (col === 1) cell.style = this.dateStyle; else if (col >= 5 && col <= 8) cell.style = this.numberStyle; else cell.style = this.dataStyle;
+        if (col === 1) cell.style = this.dateStyle; else if (col === 5) cell.style = this.numberStyle; else cell.style = this.dataStyle;
       });
     });
     inwardSheet.columns.forEach((col) => { col.width = Math.max(col.width || 10, 14); });
 
     // Third sheet: Outward Logs
     const outwardSheet = this.workbook.addWorksheet('Outward Logs');
-    outwardSheet.addRow(['DATE', 'CH.NO', 'CUSTOMER', 'ITEM', 'OK QTY', 'CR', 'MR', 'AS CAST', 'TOTAL QTY', 'UNIT', 'RATE', 'AMOUNT', 'REMARKS']);
+    outwardSheet.addRow(['DATE', 'CH.NO', 'CUSTOMER', 'ITEM', 'OK QTY', 'CR', 'MR', 'AS CAST', 'TOTAL QTY', 'UNIT', 'RATE', 'AMOUNT', 'VEHICLE NO', 'REMARKS']);
     const outwardHeader = outwardSheet.lastRow; outwardHeader.eachCell((c) => { c.style = this.headerStyle; });
     detailedOutward.forEach((t) => {
       const row = outwardSheet.addRow([
@@ -272,6 +340,7 @@ class ExcelExporter {
         t.unit,
         t.rate,
         t.totalAmount,
+        t.vehicleNumber || '-',
         t.remarks
       ]);
       row.eachCell((cell, col) => {
@@ -310,7 +379,7 @@ class ExcelExporter {
 
     // Inward transactions
     worksheet.addRow(['INWARD TRANSACTIONS']);
-    const inwardHeaders = ['Date', 'Challan No', 'Supplier', 'Quantity', 'Rate', 'Amount', 'Remarks'];
+    const inwardHeaders = ['Date', 'Challan No', 'Supplier', 'Quantity', 'Vehicle No', 'Remarks'];
     worksheet.addRow(inwardHeaders);
 
     const inwardHeaderRow = worksheet.lastRow;
@@ -324,15 +393,14 @@ class ExcelExporter {
         transaction.challanNo,
         transaction.supplier.name,
         transaction.quantityReceived,
-        transaction.rate,
-        transaction.totalAmount,
+        transaction.vehicleNumber || '-',
         transaction.remarks
       ]);
 
       row.eachCell((cell, colNumber) => {
         if (colNumber === 1) { // Date column
           cell.style = this.dateStyle;
-        } else if (colNumber >= 4) { // Number columns
+        } else if (colNumber === 4) { // Quantity column
           cell.style = this.numberStyle;
         } else {
           cell.style = this.dataStyle;
@@ -342,7 +410,7 @@ class ExcelExporter {
 
     // Outward transactions
     worksheet.addRow(['OUTWARD TRANSACTIONS']);
-    const outwardHeaders = ['Date', 'Challan No', 'Customer', 'OK Qty', 'CR Qty', 'MR Qty', 'As Cast Qty', 'Total Qty', 'Rate', 'Amount'];
+    const outwardHeaders = ['Date', 'Challan No', 'Customer', 'OK Qty', 'CR Qty', 'MR Qty', 'As Cast Qty', 'Total Qty', 'Rate', 'Amount', 'Vehicle No'];
     worksheet.addRow(outwardHeaders);
 
     const outwardHeaderRow = worksheet.lastRow;
@@ -361,7 +429,8 @@ class ExcelExporter {
         transaction.asCastQty,
         transaction.totalQty,
         transaction.rate,
-        transaction.totalAmount
+        transaction.totalAmount,
+        transaction.vehicleNumber || '-'
       ]);
 
       row.eachCell((cell, colNumber) => {

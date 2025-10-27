@@ -9,10 +9,9 @@ const router = express.Router();
 
 // @desc    Get dashboard overview data
 // @route   GET /api/dashboard/overview
-// @access  Private
+// @access  Private (Any authenticated user)
 router.get('/overview', [
   protect,
-  authorize('admin'),
   query('month').optional().isInt({ min: 1, max: 12 }).withMessage('Month must be between 1 and 12'),
   query('year').optional().isInt({ min: 2020, max: 2030 }).withMessage('Year must be between 2020 and 2030')
 ], async (req, res) => {
@@ -85,7 +84,12 @@ router.get('/overview', [
           lowStockItems: {
             $sum: {
               $cond: [
-                { $lte: ['$currentStock', '$minimumStock'] },
+                {
+                  $and: [
+                    { $gt: ['$minimumStock', 0] }, // Only count if minimumStock is set
+                    { $lte: ['$currentStock', '$minimumStock'] }
+                  ]
+                },
                 1,
                 0
               ]
@@ -300,11 +304,13 @@ router.get('/overview', [
 
 // @desc    Get low stock alerts
 // @route   GET /api/dashboard/alerts/low-stock
-// @access  Private
-router.get('/alerts/low-stock', [protect, authorize('admin')], async (req, res) => {
+// @access  Private (Any authenticated user)
+router.get('/alerts/low-stock', [protect], async (req, res) => {
   try {
     const lowStockItems = await Item.find({
       isActive: true,
+      createdBy: req.user._id, // Only user's own items
+      minimumStock: { $gt: 0 }, // Only check if user has set a minimum stock
       $expr: { $lte: ['$currentStock', '$minimumStock'] }
     })
     .select('name category unit currentStock minimumStock')
@@ -326,8 +332,8 @@ router.get('/alerts/low-stock', [protect, authorize('admin')], async (req, res) 
 
 // @desc    Get CR/MR alerts
 // @route   GET /api/dashboard/alerts/rejects
-// @access  Private
-router.get('/alerts/rejects', [protect, authorize('admin')], async (req, res) => {
+// @access  Private (Any authenticated user)
+router.get('/alerts/rejects', [protect], async (req, res) => {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
@@ -392,10 +398,9 @@ router.get('/alerts/rejects', [protect, authorize('admin')], async (req, res) =>
 
 // @desc    Get recent activities
 // @route   GET /api/dashboard/activities
-// @access  Private
+// @access  Private (Any authenticated user)
 router.get('/activities', [
   protect,
-  authorize('admin'),
   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50')
 ], async (req, res) => {
   try {

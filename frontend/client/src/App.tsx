@@ -12,6 +12,7 @@ import CustomersPage from './pages/Customers';
 import InwardPage from './pages/Inward';
 import OutwardPage from './pages/Outward';
 import ReportsPage from './pages/Reports';
+import TransactionHistoryPage from './pages/TransactionHistory';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
@@ -92,6 +93,16 @@ const AppRoutes: React.FC = () => {
             <ProtectedRoute>
               <SidebarLayout onLogout={logout}>
                 <ReportsPage />
+              </SidebarLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/transactions"
+          element={
+            <ProtectedRoute>
+              <SidebarLayout onLogout={logout}>
+                <TransactionHistoryPage />
               </SidebarLayout>
             </ProtectedRoute>
           }

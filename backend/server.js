@@ -57,6 +57,7 @@ app.use('/api/outward', require('./routes/outward'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/logs', require('./routes/logs'));
+app.use('/api/transactions', require('./routes/transactions'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

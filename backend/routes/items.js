@@ -2,15 +2,15 @@ const express = require('express');
 const { body, validationResult, query } = require('express-validator');
 const Item = require('../models/Item');
 const { protect, authorize, logActivity } = require('../middleware/auth');
+const { validateObjectId } = require('../middleware/validateObjectId');
 
 const router = express.Router();
 
-// @desc    Get all items
+// @desc    Get all items (only for logged-in user)
 // @route   GET /api/items
-// @access  Private
+// @access  Private (Any authenticated user)
 router.get('/', [
   protect,
-  authorize('admin'),
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('search').optional().isString().withMessage('Search must be a string'),
@@ -80,10 +80,10 @@ router.get('/', [
   }
 });
 
-// @desc    Get single item
+// @desc    Get single item (only user's own)
 // @route   GET /api/items/:id
-// @access  Private
-router.get('/:id', [protect, authorize('admin')], async (req, res) => {
+// @access  Private (Any authenticated user)
+router.get('/:id', [protect, validateObjectId()], async (req, res) => {
   try {
     const item = await Item.findOne({
       _id: req.params.id,
@@ -111,12 +111,11 @@ router.get('/:id', [protect, authorize('admin')], async (req, res) => {
   }
 });
 
-// @desc    Create new item
+// @desc    Create new item (for logged-in user)
 // @route   POST /api/items
-// @access  Private
+// @access  Private (Any authenticated user)
 router.post('/', [
   protect,
-  authorize('admin'),
   body('name').notEmpty().trim().withMessage('Item name is required'),
   body('category').notEmpty().trim().withMessage('Category is required'),
   // unit removed from application
@@ -163,12 +162,12 @@ router.post('/', [
   }
 });
 
-// @desc    Update item
+// @desc    Update item (only user's own)
 // @route   PUT /api/items/:id
-// @access  Private
+// @access  Private (Any authenticated user)
 router.put('/:id', [
   protect,
-  authorize('admin'),
+  validateObjectId(),
   body('name').optional().notEmpty().trim().withMessage('Item name cannot be empty'),
   body('category').optional().notEmpty().trim().withMessage('Category cannot be empty'),
   // unit removed from application
@@ -224,12 +223,12 @@ router.put('/:id', [
   }
 });
 
-// @desc    Delete item
+// @desc    Delete item (only user's own)
 // @route   DELETE /api/items/:id
-// @access  Private
+// @access  Private (Any authenticated user)
 router.delete('/:id', [
   protect,
-  authorize('admin')
+  validateObjectId()
 ], logActivity('ITEM_DELETE', 'Item'), async (req, res) => {
   try {
     const item = await Item.findOne({
@@ -240,7 +239,7 @@ router.delete('/:id', [
     if (!item) {
       return res.status(404).json({
         success: false,
-        message: 'Item not found'
+        message: 'Item not found or you do not have permission to delete it'
       });
     }
 
@@ -273,12 +272,15 @@ router.delete('/:id', [
   }
 });
 
-// @desc    Get item categories
+// @desc    Get item categories (only user's own)
 // @route   GET /api/items/categories/list
-// @access  Private
-router.get('/categories/list', [protect, authorize('admin')], async (req, res) => {
+// @access  Private (Any authenticated user)
+router.get('/categories/list', [protect], async (req, res) => {
   try {
-    const categories = await Item.distinct('category', { isActive: true });
+    const categories = await Item.distinct('category', { 
+      isActive: true,
+      createdBy: req.user._id 
+    });
     
     res.status(200).json({
       success: true,
@@ -293,13 +295,15 @@ router.get('/categories/list', [protect, authorize('admin')], async (req, res) =
   }
 });
 
-// @desc    Get low stock items
+// @desc    Get low stock items (only user's own)
 // @route   GET /api/items/alerts/low-stock
-// @access  Private
-router.get('/alerts/low-stock', [protect, authorize('admin')], async (req, res) => {
+// @access  Private (Any authenticated user)
+router.get('/alerts/low-stock', [protect], async (req, res) => {
   try {
     const lowStockItems = await Item.find({
       isActive: true,
+      createdBy: req.user._id,
+      minimumStock: { $gt: 0 }, // Only check if user has set a minimum stock
       $expr: { $lte: ['$currentStock', '$minimumStock'] }
     }).populate('createdBy', 'name email');
 

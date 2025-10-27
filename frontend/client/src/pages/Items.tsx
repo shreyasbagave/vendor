@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 type Item = {
     _id: string;
@@ -21,6 +22,7 @@ const defaultUnit = 'pcs';
 
 const ItemsPage: React.FC = () => {
     const { api } = useAuth();
+    const navigate = useNavigate();
     const [items, setItems] = useState<Item[]>([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(false);
@@ -135,25 +137,54 @@ const ItemsPage: React.FC = () => {
                                 <th style={{ textAlign: 'left', borderBottom: '1px solid #eee', padding: 12 }}>Name</th>
                                 <th style={{ textAlign: 'left', borderBottom: '1px solid #eee', padding: 12 }}>Category</th>
                                 <th style={{ textAlign: 'right', borderBottom: '1px solid #eee', padding: 12 }}>Min Stock</th>
-                                <th style={{ textAlign: 'right', borderBottom: '1px solid #eee', padding: 12 }}>Current</th>
+                                <th style={{ textAlign: 'right', borderBottom: '1px solid #eee', padding: 12, background: '#ecfdf5' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                                        <span>📦</span>
+                                        <span style={{ fontWeight: 700 }}>Remaining Stock</span>
+                                    </div>
+                                </th>
                                 <th style={{ borderBottom: '1px solid #eee', padding: 12 }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {items.map(it => (
-                                <tr key={it._id}>
+                            {items.map(it => {
+                                const currentStock = it.currentStock ?? 0;
+                                const minStock = it.minimumStock ?? 0;
+                                const isLowStock = minStock > 0 && currentStock <= minStock;
+                                const isOutOfStock = currentStock === 0;
+                                
+                                return (
+                                <tr key={it._id} style={{ background: isOutOfStock ? '#fef2f2' : isLowStock ? '#fff7ed' : 'transparent' }}>
                                     <td style={{ padding: 12 }}>{it.name}</td>
                                     <td style={{ padding: 12 }}>{it.category}</td>
                                     <td style={{ padding: 12, textAlign: 'right' }}>{it.minimumStock ?? '-'}</td>
-                                    <td style={{ padding: 12, textAlign: 'right' }}>{it.currentStock ?? '-'}</td>
+                                    <td style={{ 
+                                        padding: 12, 
+                                        textAlign: 'right',
+                                        background: isOutOfStock ? '#fee2e2' : isLowStock ? '#fed7aa' : '#d1fae5',
+                                        fontWeight: 700,
+                                        fontSize: 16,
+                                        color: isOutOfStock ? '#991b1b' : isLowStock ? '#9a3412' : '#065f46'
+                                    }}>
+                                        {currentStock}
+                                        {isOutOfStock && <span style={{ marginLeft: 6, fontSize: 12 }}>⚠️ Out</span>}
+                                        {isLowStock && !isOutOfStock && <span style={{ marginLeft: 6, fontSize: 12 }}>⚠️ Low</span>}
+                                    </td>
                                     <td style={{ padding: 12 }}>
                                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                            <button 
+                                                onClick={() => navigate(`/transactions?itemId=${it._id}&itemName=${encodeURIComponent(it.name)}`)} 
+                                                style={{ fontSize: '12px', padding: '4px 8px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                                            >
+                                                📊 History
+                                            </button>
                                             <button onClick={() => openEdit(it)} style={{ fontSize: '12px', padding: '4px 8px' }}>Edit</button>
                                             <button onClick={() => remove(it._id)} style={{ fontSize: '12px', padding: '4px 8px' }}>Delete</button>
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                             {items.length === 0 && (
                                 <tr><td colSpan={5} style={{ padding: 12, textAlign: 'center' }}>No items</td></tr>
                             )}
@@ -185,8 +216,10 @@ const ItemsPage: React.FC = () => {
                                 <input value={cat} onChange={e => setCat(e.target.value)} required style={{ width: '100%', boxSizing: 'border-box' }} />
                             </div>
                             <div>
-                                <label style={{ display: 'block', marginBottom: 6, fontWeight: 500 }}>Minimum Stock</label>
-                                <input type="number" min={0} step={1} value={minStock} onChange={e => setMinStock(e.target.value === '' ? '' : Number(e.target.value))} style={{ width: '100%', boxSizing: 'border-box' }} />
+                                <label style={{ display: 'block', marginBottom: 6, fontWeight: 500 }}>
+                                    Minimum Stock <span style={{ fontSize: '11px', color: '#666', fontWeight: 400 }}>(Optional - leave empty if not needed)</span>
+                                </label>
+                                <input type="number" min={0} step={1} value={minStock} onChange={e => setMinStock(e.target.value === '' ? '' : Number(e.target.value))} placeholder="Leave empty if not tracking" style={{ width: '100%', boxSizing: 'border-box' }} />
                             </div>
                             <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                                 <button type="button" onClick={() => setFormOpen(false)} style={{ flex: window.innerWidth < 768 ? '1 1 120px' : 'initial' }}>Cancel</button>

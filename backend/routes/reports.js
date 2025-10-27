@@ -11,10 +11,9 @@ const router = express.Router();
 
 // @desc    Get current stock statement
 // @route   GET /api/reports/stock-statement
-// @access  Private
+// @access  Private (Any authenticated user)
 router.get('/stock-statement', [
   protect,
-  authorize('admin'),
   query('category').optional().isString().withMessage('Category must be a string'),
   query('isActive').optional().isBoolean().withMessage('isActive must be a boolean')
 ], logActivity('REPORT_GENERATE', 'Report'), async (req, res) => {
@@ -101,7 +100,10 @@ router.get('/stock-statement', [
           inwardAmount: 1,
           outwardAmount: 1,
           isLowStock: {
-            $lte: ['$currentStock', '$minimumStock']
+            $and: [
+              { $gt: ['$minimumStock', 0] }, // Only check if minimumStock is set
+              { $lte: ['$currentStock', '$minimumStock'] }
+            ]
           }
         }
       },
@@ -154,10 +156,9 @@ router.get('/stock-statement', [
 
 // @desc    Get monthly report
 // @route   GET /api/reports/monthly
-// @access  Private
+// @access  Private (Any authenticated user)
 router.get('/monthly', [
   protect,
-  authorize('admin'),
   query('month').isInt({ min: 1, max: 12 }).withMessage('Month must be between 1 and 12'),
   query('year').isInt({ min: 2020, max: 2030 }).withMessage('Year must be between 2020 and 2030'),
   query('includeDetails').optional().isBoolean().withMessage('includeDetails must be a boolean')
@@ -300,7 +301,7 @@ router.get('/monthly', [
       .populate('item', 'name category unit')
       .populate('createdBy', 'name')
       .sort({ date: 1, createdAt: 1 })
-      .select('date challanNo supplier item quantityReceived unit rate totalAmount remarks createdBy');
+      .select('date challanNo supplier item quantityReceived unit rate totalAmount vehicleNumber remarks createdBy');
 
       // Get detailed outward entries
       detailedOutward = await OutwardStock.find({
@@ -310,7 +311,7 @@ router.get('/monthly', [
       .populate('item', 'name category unit')
       .populate('createdBy', 'name')
       .sort({ date: 1, createdAt: 1 })
-      .select('date challanNo customer item okQty crQty mrQty asCastQty totalQty unit rate totalAmount crReason mrReason remarks createdBy');
+      .select('date challanNo customer item okQty crQty mrQty asCastQty totalQty unit rate totalAmount vehicleNumber crReason mrReason remarks createdBy');
     }
 
     res.status(200).json({
@@ -357,10 +358,9 @@ router.get('/monthly', [
 
 // @desc    Get item-wise history
 // @route   GET /api/reports/item-history
-// @access  Private
+// @access  Private (Any authenticated user)
 router.get('/item-history', [
   protect,
-  authorize('admin'),
   query('itemId').isMongoId().withMessage('Valid item ID is required'),
   query('startDate').optional().isISO8601().withMessage('Start date must be a valid date'),
   query('endDate').optional().isISO8601().withMessage('End date must be a valid date'),
@@ -409,7 +409,7 @@ router.get('/item-history', [
     .populate('createdBy', 'name')
     .sort({ date: -1, createdAt: -1 })
     .limit(limit)
-    .select('date challanNo supplier quantityReceived unit rate totalAmount remarks createdBy');
+    .select('date challanNo supplier quantityReceived unit rate totalAmount vehicleNumber remarks createdBy');
 
     // Get outward transactions
     const outwardTransactions = await OutwardStock.find({
@@ -420,7 +420,7 @@ router.get('/item-history', [
     .populate('createdBy', 'name')
     .sort({ date: -1, createdAt: -1 })
     .limit(limit)
-    .select('date challanNo customer okQty crQty mrQty asCastQty totalQty unit rate totalAmount crReason mrReason remarks createdBy');
+    .select('date challanNo customer okQty crQty mrQty asCastQty totalQty unit rate totalAmount vehicleNumber crReason mrReason remarks createdBy');
 
     // Calculate summary
     const inwardSummary = inwardTransactions.reduce((acc, t) => {
@@ -486,10 +486,9 @@ router.get('/item-history', [
 
 // @desc    Get supplier performance report
 // @route   GET /api/reports/supplier-performance
-// @access  Private
+// @access  Private (Any authenticated user)
 router.get('/supplier-performance', [
   protect,
-  authorize('admin'),
   query('startDate').optional().isISO8601().withMessage('Start date must be a valid date'),
   query('endDate').optional().isISO8601().withMessage('End date must be a valid date')
 ], logActivity('REPORT_GENERATE', 'Report'), async (req, res) => {
@@ -571,10 +570,9 @@ router.get('/supplier-performance', [
 
 // @desc    Get customer performance report
 // @route   GET /api/reports/customer-performance
-// @access  Private
+// @access  Private (Any authenticated user)
 router.get('/customer-performance', [
   protect,
-  authorize('admin'),
   query('startDate').optional().isISO8601().withMessage('Start date must be a valid date'),
   query('endDate').optional().isISO8601().withMessage('End date must be a valid date')
 ], logActivity('REPORT_GENERATE', 'Report'), async (req, res) => {
@@ -677,7 +675,6 @@ router.get('/customer-performance', [
 // Export: Monthly report Excel with logs
 router.get('/export/excel', [
   protect,
-  authorize('admin'),
   query('month').isInt({ min: 1, max: 12 }),
   query('year').isInt({ min: 2020, max: 2030 })
 ], logActivity('REPORT_EXPORT', 'Report'), async (req, res) => {
@@ -720,12 +717,12 @@ router.get('/export/excel', [
           .populate('supplier', 'name')
           .populate('item', 'name')
           .sort({ date: 1, createdAt: 1 })
-          .select('date challanNo supplier item quantityReceived unit rate totalAmount remarks');
+          .select('date challanNo supplier item quantityReceived unit rate totalAmount vehicleNumber remarks');
         const detailedOutward = await OutwardStock.find({ date: { $gte: startDate, $lte: endDate } })
           .populate('customer', 'name')
           .populate('item', 'name')
           .sort({ date: 1, createdAt: 1 })
-          .select('date challanNo customer item okQty crQty mrQty asCastQty totalQty unit rate totalAmount remarks');
+          .select('date challanNo customer item okQty crQty mrQty asCastQty totalQty unit rate totalAmount vehicleNumber remarks');
 
         return {
           period: { month, year, monthName: startDate.toLocaleString('default', { month: 'long' }), startDate, endDate },
@@ -754,7 +751,6 @@ router.get('/export/excel', [
 // Export: Monthly report PDF with logs
 router.get('/export/pdf', [
   protect,
-  authorize('admin'),
   query('month').isInt({ min: 1, max: 12 }),
   query('year').isInt({ min: 2020, max: 2030 })
 ], logActivity('REPORT_EXPORT', 'Report'), async (req, res) => {
@@ -784,14 +780,14 @@ router.get('/export/pdf', [
     })
       .populate('supplier', 'name')
       .sort({ date: 1, createdAt: 1 })
-      .select('date challanNo supplier quantityReceived totalAmount');
+      .select('date challanNo supplier quantityReceived totalAmount vehicleNumber');
     const detailedOutward = await OutwardStock.find({ 
       date: { $gte: startDate, $lte: endDate },
       createdBy: req.user._id
     })
       .populate('customer', 'name')
       .sort({ date: 1, createdAt: 1 })
-      .select('date challanNo customer okQty crQty mrQty asCastQty totalQty');
+      .select('date challanNo customer okQty crQty mrQty asCastQty totalQty vehicleNumber');
 
     const doc = new PDFDocument({ margin: 36, size: 'A4' });
     res.setHeader('Content-Type', 'application/pdf');
@@ -806,20 +802,12 @@ router.get('/export/pdf', [
     doc.fontSize(16).text(title, { align: 'center' });
     doc.moveDown();
 
-    // Summary section
-    doc.fontSize(12).text('SUMMARY', { underline: true });
-    const inward = inwardSummary[0] || { totalEntries: 0, totalQuantity: 0, totalAmount: 0 };
-    const outward = outwardSummary[0] || { totalEntries: 0, totalQuantity: 0, totalAmount: 0, totalOkQty: 0, totalCrQty: 0, totalMrQty: 0, totalAsCastQty: 0 };
-    doc.moveDown(0.5);
-    doc.text(`Inward - Entries: ${inward.totalEntries}, Qty: ${inward.totalQuantity}, Amount: ${inward.totalAmount}`);
-    doc.text(`Outward - Entries: ${outward.totalEntries}, Qty: ${outward.totalQuantity}, OK: ${outward.totalOkQty}, CR: ${outward.totalCrQty}, MR: ${outward.totalMrQty}, As Cast: ${outward.totalAsCastQty}, Amount: ${outward.totalAmount}`);
-
     // Tables helper with visible borders
-    const drawTable = (headers, rows) => {
-      const paddingX = 4;
-      const paddingY = 4;
-      const rowHeight = 16;
-      const headerHeight = 18;
+    const drawTable = (headers, rows, compact = false) => {
+      const paddingX = compact ? 3 : 4;
+      const paddingY = compact ? 2 : 4;
+      const rowHeight = compact ? 12 : 16;
+      const headerHeight = compact ? 14 : 18;
       const borderColor = '#444';
       const startX = 36; // left margin
       let y = doc.y + 8;
@@ -850,7 +838,7 @@ router.get('/export/pdf', [
 
       // Header
       ensureSpace(headerHeight);
-      doc.save().fontSize(10);
+      doc.save().fontSize(compact ? 8 : 10);
       doc.save().fillColor('#f0f0f0').rect(startX, y, pageWidth, headerHeight).fill();
       drawRowBorders(y, headerHeight);
       let tx = startX;
@@ -866,6 +854,7 @@ router.get('/export/pdf', [
         ensureSpace(rowHeight);
         drawRowBorders(y, rowHeight);
         let cx = startX;
+        doc.fontSize(compact ? 8 : 10);
         r.forEach((cell, i) => {
           const isNumeric = typeof cell === 'number';
           doc.fillColor('#000').text(String(cell ?? ''), cx + paddingX, y + paddingY, {
@@ -879,24 +868,95 @@ router.get('/export/pdf', [
       doc.moveDown();
     };
 
+    // Summary section with side-by-side compact tables
+    const inward = inwardSummary[0] || { totalEntries: 0, totalQuantity: 0, totalAmount: 0 };
+    const outward = outwardSummary[0] || { totalEntries: 0, totalQuantity: 0, totalAmount: 0, totalOkQty: 0, totalCrQty: 0, totalMrQty: 0, totalAsCastQty: 0 };
+    
     doc.moveDown();
-    doc.fontSize(12).text('INWARD', { underline: true });
-    drawTable(['DATE', 'CH.NO', 'QTY', 'TOTAL'], detailedInward.map(t => {
+    doc.fontSize(12).text('SUMMARY', { underline: true, align: 'center' });
+    doc.moveDown(0.5);
+    
+    // Draw side-by-side tables
+    const leftX = 36;
+    const rightX = 310;
+    const tableWidth = 250;
+    const startY = doc.y;
+    
+    // Helper for side-by-side tables
+    const drawSideBySideTable = (x, y, title, headers, rows, bgColor) => {
+      const paddingX = 3;
+      const paddingY = 2;
+      const rowHeight = 12;
+      const headerHeight = 14;
+      const colWidth = tableWidth / 2;
+      
+      // Title
+      doc.save();
+      doc.fontSize(9).fillColor('#000').font('Helvetica-Bold');
+      doc.rect(x, y, tableWidth, headerHeight).fillAndStroke(bgColor, '#444');
+      doc.fillColor('#000').text(title, x, y + 3, { width: tableWidth, align: 'center' });
+      doc.restore();
+      y += headerHeight;
+      
+      // Headers
+      doc.save();
+      doc.fontSize(8).font('Helvetica-Bold');
+      doc.rect(x, y, tableWidth, headerHeight).fillAndStroke('#f0f0f0', '#444');
+      doc.moveTo(x + colWidth, y).lineTo(x + colWidth, y + headerHeight).stroke();
+      doc.fillColor('#000').text(headers[0], x + paddingX, y + paddingY, { width: colWidth - paddingX * 2 });
+      doc.text(headers[1], x + colWidth + paddingX, y + paddingY, { width: colWidth - paddingX * 2, align: 'right' });
+      doc.restore();
+      y += headerHeight;
+      
+      // Rows
+      doc.fontSize(8).font('Helvetica');
+      rows.forEach(([metric, value]) => {
+        doc.rect(x, y, tableWidth, rowHeight).stroke('#444');
+        doc.moveTo(x + colWidth, y).lineTo(x + colWidth, y + rowHeight).stroke();
+        doc.fillColor('#000').text(metric, x + paddingX, y + paddingY, { width: colWidth - paddingX * 2 });
+        doc.text(String(value), x + colWidth + paddingX, y + paddingY, { width: colWidth - paddingX * 2, align: 'right' });
+        y += rowHeight;
+      });
+      
+      return y;
+    };
+    
+    // Inward Summary (Left)
+    drawSideBySideTable(leftX, startY, 'INWARD SUMMARY', ['Metric', 'Value'], [
+      ['Total Entries', inward.totalEntries],
+      ['Total Quantity', inward.totalQuantity]
+    ], '#D4EDDA');
+    
+    // Outward Summary (Right)
+    drawSideBySideTable(rightX, startY, 'OUTWARD SUMMARY', ['Metric', 'Value'], [
+      ['Total Entries', outward.totalEntries],
+      ['Total Quantity', outward.totalQuantity],
+      ['OK Quantity', outward.totalOkQty],
+      ['CR Quantity', outward.totalCrQty],
+      ['MR Quantity', outward.totalMrQty]
+    ], '#FFF3CD');
+    
+    // Move down past the taller table
+    doc.y = startY + (5 * 12) + 14 + 14 + 10; // outward rows + headers + title + margin
+
+    doc.moveDown();
+    doc.fontSize(12).text('INWARD TRANSACTIONS', 36, doc.y, { underline: true });
+    drawTable(['DATE', 'CH.NO', 'QTY', 'VEHICLE NO'], detailedInward.map(t => {
       const date = new Date(t.date);
       const day = date.getDate().toString().padStart(2, '0');
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
       const year = date.getFullYear();
-      return [`${day}/${month}/${year}`, t.challanNo, t.quantityReceived, t.totalAmount ?? '-'];
+      return [`${day}/${month}/${year}`, t.challanNo, t.quantityReceived, t.vehicleNumber || '-'];
     }));
 
     doc.addPage();
-    doc.fontSize(12).text('OUTWARD', { underline: true });
-    drawTable(['DATE', 'CH.NO', 'OK QTY', 'CR', 'MR', 'AS CAST', 'TOTAL'], detailedOutward.map(t => {
+    doc.fontSize(12).text('OUTWARD TRANSACTIONS', 36, doc.y, { underline: true });
+    drawTable(['DATE', 'CH.NO', 'OK QTY', 'CR', 'MR', 'AS CAST', 'TOTAL', 'VEH NO'], detailedOutward.map(t => {
       const date = new Date(t.date);
       const day = date.getDate().toString().padStart(2, '0');
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
       const year = date.getFullYear();
-      return [`${day}/${month}/${year}`, t.challanNo, t.okQty, t.crQty, t.mrQty, t.asCastQty, t.totalQty];
+      return [`${day}/${month}/${year}`, t.challanNo, t.okQty, t.crQty, t.mrQty, t.asCastQty, t.totalQty, t.vehicleNumber || '-'];
     }));
 
     doc.end();

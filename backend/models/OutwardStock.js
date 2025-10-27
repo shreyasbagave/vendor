@@ -12,6 +12,11 @@ const outwardStockSchema = new mongoose.Schema({
     trim: true,
     maxlength: [50, 'Challan number cannot exceed 50 characters']
   },
+  vehicleNumber: {
+    type: String,
+    trim: true,
+    maxlength: [20, 'Vehicle number cannot exceed 20 characters']
+  },
   customer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Customer',
@@ -95,8 +100,8 @@ outwardStockSchema.index({ challanNo: 1, customer: 1 }, { unique: true });
 
 // Pre-save middleware to calculate total quantity and amount
 outwardStockSchema.pre('save', function(next) {
-  // Calculate total quantity
-  this.totalQty = this.okQty + this.crQty + this.mrQty + this.asCastQty;
+  // Calculate total quantity: Total = OK + As Cast (CR and MR are PART OF OK, not separate)
+  this.totalQty = this.okQty + this.asCastQty;
   
   // Calculate total amount
   if (this.rate && this.totalQty) {
@@ -107,6 +112,7 @@ outwardStockSchema.pre('save', function(next) {
 });
 
 // Pre-save middleware to validate stock availability
+// Only OK quantity leaves warehouse, so validate against OK qty
 outwardStockSchema.pre('save', async function(next) {
   try {
     const Item = mongoose.model('Item');
@@ -116,9 +122,13 @@ outwardStockSchema.pre('save', async function(next) {
       return next(new Error('Item not found'));
     }
     
-    if (item.currentStock < this.totalQty) {
-      return next(new Error(`Insufficient stock. Available: ${item.currentStock}, Required: ${this.totalQty}`));
+    // Validate that OK quantity doesn't exceed current stock
+    if (item.currentStock < this.okQty) {
+      return next(new Error(`Insufficient stock. Available: ${item.currentStock}, Required: ${this.okQty}`));
     }
+    
+    // As Cast should be remaining stock
+    this.asCastQty = item.currentStock - this.okQty;
     
     next();
   } catch (error) {
@@ -127,12 +137,13 @@ outwardStockSchema.pre('save', async function(next) {
 });
 
 // Post-save middleware to update item stock
+// Only OK quantity leaves the warehouse, As Cast remains in workshop
 outwardStockSchema.post('save', async function() {
   try {
     const Item = mongoose.model('Item');
     await Item.findByIdAndUpdate(
       this.item,
-      { $inc: { currentStock: -this.totalQty } }
+      { $inc: { currentStock: -this.okQty } }
     );
   } catch (error) {
     console.error('Error updating item stock:', error);
@@ -140,12 +151,13 @@ outwardStockSchema.post('save', async function() {
 });
 
 // Post-remove middleware to update item stock when deleting
+// Only restore OK quantity when deleting outward entry
 outwardStockSchema.post('remove', async function() {
   try {
     const Item = mongoose.model('Item');
     await Item.findByIdAndUpdate(
       this.item,
-      { $inc: { currentStock: this.totalQty } }
+      { $inc: { currentStock: this.okQty } }
     );
   } catch (error) {
     console.error('Error updating item stock on delete:', error);

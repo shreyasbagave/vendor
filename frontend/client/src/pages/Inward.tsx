@@ -9,6 +9,7 @@ interface InwardEntry {
     _id: string;
     date: string;
     challanNo: string;
+    vehicleNumber?: string;
     supplier: {
         _id: string;
         name: string;
@@ -30,6 +31,7 @@ const InwardPage: React.FC = () => {
     const { api } = useAuth();
     const [date, setDate] = useState<string>(() => getTodayDateString());
     const [challan, setChallan] = useState('');
+    const [vehicleNumber, setVehicleNumber] = useState('');
     const [supplier, setSupplier] = useState('');
     const [item, setItem] = useState('');
     const [quantityReceived, setQty] = useState<number | ''>('');
@@ -77,24 +79,61 @@ const InwardPage: React.FC = () => {
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
-        if (!supplier || !item) { setError('Supplier and Item are required'); return; }
+        
+        // Frontend validation
+        if (!date || date.trim() === '') {
+            setError('Date is required');
+            return;
+        }
+        if (!challan || challan.trim() === '') {
+            setError('Challan number is required');
+            return;
+        }
+        if (!supplier || supplier.trim() === '') {
+            setError('Please select a supplier');
+            return;
+        }
+        if (!item || item.trim() === '') {
+            setError('Please select an item');
+            return;
+        }
+        
         const qty = quantityReceived === '' ? 0 : Number(quantityReceived);
-        if (qty <= 0) { setError('Quantity must be greater than 0'); return; }
+        if (qty <= 0) {
+            setError('Quantity must be greater than 0');
+            return;
+        }
+        
         setLoading(true);
         try {
             await api.post('/inward', {
                 date,
-                challanNo: challan,
-                supplier,
-                item,
-                quantityReceived: qty,
-                
+                challanNo: challan.trim(),
+                vehicleNumber: vehicleNumber.trim(),
+                supplier: supplier.trim(),
+                item: item.trim(),
+                quantityReceived: qty
             });
-            setChallan(''); setSupplier(''); setItem(''); setQty('');
-            alert('Inward entry added');
-            loadEntries(); // Reload entries after successful submission
+            setChallan(''); 
+            setVehicleNumber('');
+            setSupplier(''); 
+            setItem(''); 
+            setQty('');
+            alert('Inward entry added successfully');
+            // Refresh both entries and items (to show updated stock)
+            await loadRefs(); // Refresh items with updated stock
+            loadEntries(); // Refresh inward entries list
         } catch (err: any) {
-            setError(err?.response?.data?.message || err?.message || 'Save failed');
+            console.error('Submit error:', err);
+            // Display detailed error messages
+            if (err?.response?.data?.errors && Array.isArray(err.response.data.errors)) {
+                const errorMessages = err.response.data.errors
+                    .map((e: any) => `${e.field}: ${e.message}`)
+                    .join('\n');
+                setError(errorMessages);
+            } else {
+                setError(err?.response?.data?.message || err?.message || 'Failed to save entry');
+            }
         } finally {
             setLoading(false);
         }
@@ -107,6 +146,8 @@ const InwardPage: React.FC = () => {
             await api.delete(`/inward/${entryId}`);
             setEntries(entries.filter(entry => entry._id !== entryId));
             alert('Inward entry deleted successfully');
+            // Refresh items to show updated stock after deletion
+            await loadRefs();
         } catch (err: any) {
             alert(err?.response?.data?.message || err?.message || 'Failed to delete entry');
         }
@@ -116,6 +157,7 @@ const InwardPage: React.FC = () => {
         setEditingEntry(entry);
         setDate(entry.date.split('T')[0]);
         setChallan(entry.challanNo);
+        setVehicleNumber(entry.vehicleNumber || '');
         setSupplier(entry.supplier._id);
         setItem(entry.item._id);
         setQty(entry.quantityReceived);
@@ -126,24 +168,62 @@ const InwardPage: React.FC = () => {
         if (!editingEntry) return;
         
         setError(null);
-        if (!supplier || !item) { setError('Supplier and Item are required'); return; }
+        
+        // Frontend validation
+        if (!date || date.trim() === '') {
+            setError('Date is required');
+            return;
+        }
+        if (!challan || challan.trim() === '') {
+            setError('Challan number is required');
+            return;
+        }
+        if (!supplier || supplier.trim() === '') {
+            setError('Please select a supplier');
+            return;
+        }
+        if (!item || item.trim() === '') {
+            setError('Please select an item');
+            return;
+        }
+        
         const qty = quantityReceived === '' ? 0 : Number(quantityReceived);
-        if (qty <= 0) { setError('Quantity must be greater than 0'); return; }
+        if (qty <= 0) {
+            setError('Quantity must be greater than 0');
+            return;
+        }
+        
         setLoading(true);
         try {
             await api.put(`/inward/${editingEntry._id}`, {
                 date,
-                challanNo: challan,
-                supplier,
-                item,
-                quantityReceived: qty,
+                challanNo: challan.trim(),
+                vehicleNumber: vehicleNumber.trim(),
+                supplier: supplier.trim(),
+                item: item.trim(),
+                quantityReceived: qty
             });
-            setChallan(''); setSupplier(''); setItem(''); setQty('');
+            setChallan(''); 
+            setVehicleNumber('');
+            setSupplier(''); 
+            setItem(''); 
+            setQty('');
             setEditingEntry(null);
             alert('Inward entry updated successfully');
-            loadEntries();
+            // Refresh both entries and items (to show updated stock)
+            await loadRefs(); // Refresh items with updated stock
+            loadEntries(); // Refresh inward entries list
         } catch (err: any) {
-            setError(err?.response?.data?.message || err?.message || 'Update failed');
+            console.error('Update error:', err);
+            // Display detailed error messages
+            if (err?.response?.data?.errors && Array.isArray(err.response.data.errors)) {
+                const errorMessages = err.response.data.errors
+                    .map((e: any) => `${e.field}: ${e.message}`)
+                    .join('\n');
+                setError(errorMessages);
+            } else {
+                setError(err?.response?.data?.message || err?.message || 'Failed to update entry');
+            }
         } finally {
             setLoading(false);
         }
@@ -151,7 +231,7 @@ const InwardPage: React.FC = () => {
 
     const handleCancelEdit = () => {
         setEditingEntry(null);
-        setChallan(''); setSupplier(''); setItem(''); setQty('');
+        setChallan(''); setVehicleNumber(''); setSupplier(''); setItem(''); setQty('');
         setDate(getTodayDateString());
     };
 
@@ -163,7 +243,12 @@ const InwardPage: React.FC = () => {
                     <div style={{ color: '#666' }}>Record received stock with challan and party details</div>
                 </div>
 
-                {error && <div style={{ color: '#842029', background: '#f8d7da', border: '1px solid #f5c2c7', padding: 10, borderRadius: 8, marginBottom: 12 }}>{error}</div>}
+                {error && (
+                    <div style={{ color: '#842029', background: '#f8d7da', border: '1px solid #f5c2c7', padding: 12, borderRadius: 8, marginBottom: 12, whiteSpace: 'pre-line', fontSize: 14 }}>
+                        <strong>Error:</strong><br />
+                        {error}
+                    </div>
+                )}
 
                 <form onSubmit={editingEntry ? handleUpdate : submit}>
                     <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, boxShadow: '0 1px 2px rgba(0,0,0,.04)' }}>
@@ -177,6 +262,13 @@ const InwardPage: React.FC = () => {
                                 <div>
                                     <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Challan No</label>
                                     <input value={challan} onChange={e => setChallan(e.target.value)} required placeholder="e.g. CH/2025/001" style={{ width: '100%', boxSizing: 'border-box' }} />
+                                </div>
+                            </div>
+
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1fr 1fr', gap: 12 }}>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Vehicle Number</label>
+                                    <input value={vehicleNumber} onChange={e => setVehicleNumber(e.target.value)} placeholder="e.g. MH-12-AB-1234" style={{ width: '100%', boxSizing: 'border-box' }} />
                                 </div>
                             </div>
 
@@ -238,6 +330,7 @@ const InwardPage: React.FC = () => {
                                         <tr>
                                             <th style={{ textAlign: 'left', padding: 12, borderBottom: '1px solid #eee' }}>Date</th>
                                             <th style={{ textAlign: 'left', padding: 12, borderBottom: '1px solid #eee' }}>Challan No</th>
+                                            <th style={{ textAlign: 'left', padding: 12, borderBottom: '1px solid #eee' }}>Vehicle No</th>
                                             <th style={{ textAlign: 'left', padding: 12, borderBottom: '1px solid #eee' }}>Supplier</th>
                                             <th style={{ textAlign: 'left', padding: 12, borderBottom: '1px solid #eee' }}>Item</th>
                                             <th style={{ textAlign: 'right', padding: 12, borderBottom: '1px solid #eee' }}>Qty</th>
@@ -252,6 +345,9 @@ const InwardPage: React.FC = () => {
                                                 </td>
                                                 <td style={{ padding: 12, borderBottom: '1px solid #f0f0f0' }}>
                                                     {entry.challanNo}
+                                                </td>
+                                                <td style={{ padding: 12, borderBottom: '1px solid #f0f0f0' }}>
+                                                    {entry.vehicleNumber || '-'}
                                                 </td>
                                                 <td style={{ padding: 12, borderBottom: '1px solid #f0f0f0' }}>
                                                     {entry.supplier.name}
@@ -298,7 +394,7 @@ const InwardPage: React.FC = () => {
                                         ))}
                                         {entries.length === 0 && (
                                             <tr>
-                                                <td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#888' }}>
+                                                <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#888' }}>
                                                     No inward entries found
                                                 </td>
                                             </tr>
