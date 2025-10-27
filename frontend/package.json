@@ -5,5 +5,8 @@
     "start": "cd client && npm start",
     "build": "cd client && npm run build",
     "test": "cd client && npm test"
+  },
+  "dependencies": {
+    "@testing-library/react": "^16.3.0"
   }
 }

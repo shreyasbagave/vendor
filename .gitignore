@@ -5,9 +5,8 @@ backend/node_modules/
 frontend/client/node_modules/
 
 # Production build
-frontend/client/build/
-/build
-dist/
+
+
 
 # Environment variables
 
