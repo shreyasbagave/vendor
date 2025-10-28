@@ -28,16 +28,27 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
+    console.log('🌐 CORS request from origin:', origin);
+    
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('✅ CORS: Allowing request with no origin');
+      return callback(null, true);
+    }
     
     if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log('✅ CORS: Allowing origin:', origin);
       callback(null, true);
     } else {
+      console.log('❌ CORS: Rejecting origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 600 // 10 minutes
 }));
 
 // Body parsing middleware
@@ -107,4 +118,5 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`CORS allowed origins:`, allowedOrigins);
 });
