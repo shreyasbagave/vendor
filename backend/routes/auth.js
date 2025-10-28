@@ -22,8 +22,11 @@ router.post('/login', [
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
 ], async (req, res) => {
   try {
+    console.log('🔐 Login attempt for username:', req.body.username);
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Login validation errors:', errors.array());
       return res.status(400).json({
         success: false,
         message: 'Validation errors',
@@ -42,11 +45,14 @@ router.post('/login', [
     }).select('+password');
 
     if (!user) {
+      console.log('❌ User not found for username:', username);
       return res.status(401).json({
         success: false,
         message: 'Username or password is wrong'
       });
     }
+    
+    console.log('✅ User found:', { id: user._id, name: user.name, email: user.email });
 
     // Check if account is locked
     if (user.isLocked) {
@@ -126,8 +132,16 @@ router.post('/register', [
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
 ], async (req, res) => {
   try {
+    console.log('📝 Registration attempt with data:', { 
+      username: req.body.username, 
+      email: req.body.email, 
+      hasPassword: !!req.body.password,
+      bodyKeys: Object.keys(req.body)
+    });
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Validation errors:', errors.array());
       return res.status(400).json({
         success: false,
         message: 'Validation errors',
@@ -145,6 +159,12 @@ router.post('/register', [
       ]
     });
     if (existing) {
+      console.log('❌ User already exists:', { 
+        requestedUsername: username, 
+        requestedEmail: email,
+        existingName: existing.name,
+        existingEmail: existing.email
+      });
       return res.status(400).json({
         success: false,
         message: 'User already exists with this username or email'
@@ -152,6 +172,7 @@ router.post('/register', [
     }
 
     const user = await User.create({ name: username, email, password, role: 'admin' });
+    console.log('✅ User created successfully:', { id: user._id, name: user.name, email: user.email });
 
     const token = generateToken(user._id);
 
