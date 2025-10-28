@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 // Use environment variable if provided, otherwise use default
-const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://vendor-11.onrender.com/api';
 
 export class ApiClient {
     private readonly axiosInstance: AxiosInstance;
