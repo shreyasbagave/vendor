@@ -55,13 +55,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw new Error(res.data?.message || 'Login failed');
         } catch (error: any) {
             console.error('❌ Login error:', error.message, error.response?.status, error.response?.data);
-            throw error;
+            // Extract detailed error message from backend
+            const backendMessage = error.response?.data?.message;
+            const validationErrors = error.response?.data?.errors;
+            let errorMessage = error.message || 'Login failed';
+            
+            if (backendMessage) {
+                errorMessage = backendMessage;
+                // If there are validation errors, append them
+                if (validationErrors && Array.isArray(validationErrors)) {
+                    const details = validationErrors.map((e: any) => e.msg || e.message).join(', ');
+                    errorMessage = `${backendMessage}: ${details}`;
+                }
+            }
+            
+            const err = new Error(errorMessage);
+            (err as any).response = error.response;
+            throw err;
         }
     }, [api]);
 
     const register = useCallback(async (username: string, email: string, password: string) => {
         try {
             console.log('📝 Attempting registration to:', api['axiosInstance'].defaults.baseURL);
+            console.log('📝 Registration data:', { username, email, password: '***' });
             const res = await api.post<LoginResponse>('/auth/register', { username, email, password });
             console.log('✅ Registration response:', res.status, res.data);
             if (res.data?.success && res.data.data?.token && res.data.data.user) {
@@ -72,7 +89,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw new Error(res.data?.message || 'Registration failed');
         } catch (error: any) {
             console.error('❌ Registration error:', error.message, error.response?.status, error.response?.data);
-            throw error;
+            // Extract detailed error message from backend
+            const backendMessage = error.response?.data?.message;
+            const validationErrors = error.response?.data?.errors;
+            let errorMessage = error.message || 'Registration failed';
+            
+            if (backendMessage) {
+                errorMessage = backendMessage;
+                // If there are validation errors, append them
+                if (validationErrors && Array.isArray(validationErrors)) {
+                    const details = validationErrors.map((e: any) => e.msg || e.message).join(', ');
+                    errorMessage = `${backendMessage}: ${details}`;
+                }
+            }
+            
+            const err = new Error(errorMessage);
+            (err as any).response = error.response;
+            throw err;
         }
     }, [api]);
 
