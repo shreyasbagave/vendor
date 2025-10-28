@@ -8,9 +8,9 @@
     "dev": "nodemon server.js",
     "client": "cd ../frontend/client && npm start",
     "server": "nodemon server.js",
-    "build": "npm install --prefix ../frontend/client && npm run build --prefix ../frontend/client",
-    "heroku-postbuild": "npm install && npm install --prefix ../frontend/client && npm run build --prefix ../frontend/client",
-    "render-build": "npm install && npm install --legacy-peer-deps --prefix ../frontend/client && npm run build --prefix ../frontend/client"
+    "build": "echo 'Backend only - no frontend build needed'",
+    "heroku-postbuild": "npm install",
+    "render-build": "npm install"
   },
   "keywords": [
     "stock",

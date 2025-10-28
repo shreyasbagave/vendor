@@ -1,11 +1,11 @@
 services:
-  # Backend API Service (serves both API and frontend)
+  # Backend API Service (backend only - frontend deployed separately)
   - type: web
     name: stock-management-api
     env: node
     region: oregon
     plan: free
-    buildCommand: npm run render-build
+    buildCommand: npm install
     startCommand: npm start
     rootDir: backend
     envVars:
