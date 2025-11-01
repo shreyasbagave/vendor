@@ -321,4 +321,71 @@ router.get('/alerts/low-stock', [protect], async (req, res) => {
   }
 });
 
+// @desc    Adjust stock for an item (only user's own)
+// @route   POST /api/items/:id/adjust
+// @access  Private (Any authenticated user)
+router.post('/:id/adjust', [
+  protect,
+  validateObjectId(),
+  body('adjustment').notEmpty().withMessage('Adjustment amount is required').isFloat().withMessage('Adjustment must be a valid number'),
+  body('reason').optional().trim().isLength({ max: 500 }).withMessage('Reason cannot exceed 500 characters')
+], logActivity('STOCK_ADJUST', 'Item'), async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array()
+      });
+    }
+
+    const item = await Item.findOne({
+      _id: req.params.id,
+      createdBy: req.user._id
+    });
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: 'Item not found'
+      });
+    }
+
+    const adjustment = parseFloat(req.body.adjustment);
+    const previousStock = item.currentStock;
+    const newStock = previousStock + adjustment;
+
+    if (newStock < 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot adjust stock below 0. Current stock: ${previousStock}, Adjustment: ${adjustment}`
+      });
+    }
+
+    item.currentStock = newStock;
+    await item.save();
+
+    await item.populate('createdBy', 'name email');
+
+    res.status(200).json({
+      success: true,
+      message: 'Stock adjusted successfully',
+      data: {
+        item,
+        previousStock,
+        adjustment,
+        newStock: item.currentStock,
+        reason: req.body.reason || null
+      }
+    });
+  } catch (error) {
+    console.error('Adjust stock error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
 module.exports = router;
