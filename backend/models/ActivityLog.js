@@ -11,7 +11,7 @@ const activityLogSchema = new mongoose.Schema({
     required: [true, 'Action is required'],
     enum: [
       'LOGIN', 'LOGOUT', 'PASSWORD_CHANGE',
-      'ITEM_CREATE', 'ITEM_UPDATE', 'ITEM_DELETE',
+      'ITEM_CREATE', 'ITEM_UPDATE', 'ITEM_DELETE', 'STOCK_ADJUST',
       'SUPPLIER_CREATE', 'SUPPLIER_UPDATE', 'SUPPLIER_DELETE',
       'CUSTOMER_CREATE', 'CUSTOMER_UPDATE', 'CUSTOMER_DELETE',
       'INWARD_CREATE', 'INWARD_UPDATE', 'INWARD_DELETE',

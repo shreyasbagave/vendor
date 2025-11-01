@@ -329,7 +329,7 @@ router.post('/:id/adjust', [
   validateObjectId(),
   body('adjustment').notEmpty().withMessage('Adjustment amount is required').isFloat().withMessage('Adjustment must be a valid number'),
   body('reason').optional().trim().isLength({ max: 500 }).withMessage('Reason cannot exceed 500 characters')
-], logActivity('STOCK_ADJUST', 'Item'), async (req, res) => {
+], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -367,6 +367,44 @@ router.post('/:id/adjust', [
     await item.save();
 
     await item.populate('createdBy', 'name email');
+
+    // Log activity with metadata
+    try {
+      const ActivityLog = require('../models/ActivityLog');
+      const adjustmentSign = adjustment >= 0 ? '+' : '';
+      const description = `Stock adjusted for ${item.name}: ${previousStock} → ${newStock} (${adjustmentSign}${adjustment})${req.body.reason ? ` - Reason: ${req.body.reason}` : ''}`;
+      
+      await ActivityLog.logActivity(
+        req.user._id,
+        'STOCK_ADJUST',
+        'Item',
+        item._id,
+        description,
+        req
+      );
+      
+      // Update the log with metadata
+      const latestLog = await ActivityLog.findOne({ 
+        user: req.user._id, 
+        action: 'STOCK_ADJUST',
+        entityId: item._id 
+      }).sort({ createdAt: -1 });
+      
+      if (latestLog) {
+        latestLog.metadata = {
+          itemName: item.name,
+          previousStock,
+          adjustment,
+          newStock,
+          reason: req.body.reason || null,
+          date: new Date()
+        };
+        await latestLog.save();
+      }
+    } catch (logError) {
+      console.error('Error logging stock adjustment:', logError);
+      // Don't fail the request if logging fails
+    }
 
     res.status(200).json({
       success: true,

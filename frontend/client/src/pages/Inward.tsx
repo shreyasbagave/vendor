@@ -500,7 +500,7 @@ const InwardPage: React.FC = () => {
                         zIndex: 1000,
                         padding: 20
                     }} onClick={(e) => {
-                        if (e.target === e.currentTarget) && !adjustLoading) {
+                        if ((e.target === e.currentTarget) && !adjustLoading) {
                             handleCancelAdjust();
                         }
                     }}>

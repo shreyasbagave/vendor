@@ -153,17 +153,57 @@ const ReportsPage: React.FC = () => {
                                                     <tr style={{ background: '#fafafa' }}>
                                                         <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid #eee' }}>Date</th>
                                                         <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid #eee' }}>Ch.No</th>
-                                                        <th style={{ textAlign: 'right', padding: 8, borderBottom: '1px solid #eee' }}>Qty</th>
+                                                        <th style={{ textAlign: 'right', padding: 8, borderBottom: '1px solid #eee' }}>Quantity</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {(monthly?.detailedInward || []).map((row: any, idx: number) => (
-                                                        <tr key={idx}>
-                                                            <td style={{ padding: 8, borderBottom: '1px solid #f0f0f0' }}>{formatDate(row.date)}</td>
-                                                            <td style={{ padding: 8, borderBottom: '1px solid #f0f0f0' }}>{row.challanNo}</td>
-                                                            <td style={{ padding: 8, borderBottom: '1px solid #f0f0f0', textAlign: 'right' }}>{row.quantityReceived}</td>
-                                                        </tr>
-                                                    ))}
+                                                    {(monthly?.detailedInward || []).map((row: any, idx: number) => {
+                                                        const isAdjustment = row.isAdjustment === true;
+                                                        const isOpeningStock = row.isOpeningStock === true;
+                                                        const adjustmentQty = row.adjustmentQuantity || row.quantityReceived || 0;
+                                                        return (
+                                                            <tr key={idx}>
+                                                                <td style={{ 
+                                                                    padding: 8, 
+                                                                    borderBottom: '1px solid #f0f0f0',
+                                                                    textAlign: 'left',
+                                                                    fontWeight: isOpeningStock ? 500 : 'normal',
+                                                                    color: isOpeningStock ? '#6c757d' : 'inherit'
+                                                                }}>
+                                                                    {isOpeningStock ? (
+                                                                        formatDate(row.date) // Show first day of month
+                                                                    ) : isAdjustment ? (
+                                                                        <span>Adjusted Quantity</span>
+                                                                    ) : (
+                                                                        formatDate(row.date)
+                                                                    )}
+                                                                </td>
+                                                                <td style={{ 
+                                                                    padding: 8, 
+                                                                    borderBottom: '1px solid #f0f0f0',
+                                                                    fontWeight: isOpeningStock ? 600 : 'normal',
+                                                                    color: isOpeningStock ? '#495057' : 'inherit'
+                                                                }}>
+                                                                    {row.challanNo || 'ADJ'}
+                                                                </td>
+                                                                <td style={{ 
+                                                                    padding: 8, 
+                                                                    borderBottom: '1px solid #f0f0f0', 
+                                                                    textAlign: 'right',
+                                                                    fontWeight: isAdjustment || isOpeningStock ? 600 : 'normal',
+                                                                    color: isAdjustment ? (adjustmentQty >= 0 ? '#28a745' : '#dc3545') : 'inherit'
+                                                                }}>
+                                                                    {isOpeningStock ? (
+                                                                        row.quantityReceived || row.openingStock || 0
+                                                                    ) : isAdjustment ? (
+                                                                        <span>{adjustmentQty >= 0 ? '+' : ''}{adjustmentQty}</span>
+                                                                    ) : (
+                                                                        row.quantityReceived
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
                                                     {(!monthly?.detailedInward || monthly.detailedInward.length === 0) && (
                                                         <tr><td colSpan={3} style={{ padding: 12, textAlign: 'center', color: '#888' }}>No inward entries</td></tr>
                                                     )}

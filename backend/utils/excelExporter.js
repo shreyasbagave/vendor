@@ -306,18 +306,43 @@ class ExcelExporter {
     inwardSheet.addRow(['DATE', 'CH.NO', 'SUPPLIER', 'ITEM', 'QTY', 'UNIT', 'VEHICLE NO', 'REMARKS']);
     const inwardHeader = inwardSheet.lastRow; inwardHeader.eachCell((c) => { c.style = this.headerStyle; });
     detailedInward.forEach((t) => {
+      const isAdjustment = t.isAdjustment === true;
+      const isOpeningStock = t.isOpeningStock === true;
+      const adjustmentQty = t.adjustmentQuantity || t.quantityReceived || 0;
+      
       const row = inwardSheet.addRow([
-        t.date,
-        t.challanNo,
-        t.supplier?.name,
-        t.item?.name,
-        t.quantityReceived,
-        t.unit,
+        isOpeningStock ? (t.date || '') : (isAdjustment ? 'Adjusted Quantity' : (t.date || '')),
+        t.challanNo || 'ADJ',
+        isOpeningStock || isAdjustment ? '-' : (t.supplier?.name || '-'),
+        t.item?.name || '-',
+        isOpeningStock ? (t.quantityReceived || t.openingStock || 0) : (isAdjustment ? adjustmentQty : (t.quantityReceived || 0)),
+        t.unit || '-',
         t.vehicleNumber || '-',
-        t.remarks
+        t.remarks || '-'
       ]);
+      
       row.eachCell((cell, col) => {
-        if (col === 1) cell.style = this.dateStyle; else if (col === 5) cell.style = this.numberStyle; else cell.style = this.dataStyle;
+        if (col === 1) {
+          // Date column: date style for opening stock and regular entries, text for adjustments
+          if (isOpeningStock) {
+            cell.style = this.dateStyle;
+          } else if (isAdjustment) {
+            cell.style = { ...this.dataStyle, font: { bold: true, color: { argb: '6C757D' } } };
+          } else {
+            cell.style = this.dateStyle;
+          }
+        } else if (col === 5) {
+          // Quantity column: number style with color for adjustments
+          cell.style = this.numberStyle;
+          if (isAdjustment) {
+            cell.font = { bold: true, color: { argb: adjustmentQty >= 0 ? '28A745' : 'DC3545' } };
+            cell.value = adjustmentQty >= 0 ? `+${adjustmentQty}` : `${adjustmentQty}`;
+          } else if (isOpeningStock) {
+            cell.font = { bold: true };
+          }
+        } else {
+          cell.style = this.dataStyle;
+        }
       });
     });
     inwardSheet.columns.forEach((col) => { col.width = Math.max(col.width || 10, 14); });
